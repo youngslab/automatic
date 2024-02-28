@@ -1,0 +1,2 @@
+
+from .automatic import Automatic
