@@ -8,8 +8,10 @@ from webdriver_manager.microsoft import EdgeChromiumDriverManager
 
 import time
 
+
 def module_name(obj):
     return obj.__class__.__module__
+
 
 def package_name(obj):
     parts = module_name(obj).split(".")
@@ -28,6 +30,7 @@ def create_driver(headless=False):
     import time
     time.sleep(1)
     return webdriver.Edge(options=options, service=service)
+
 
 def wait(func, *, timeout, interval=0.5):
     """
