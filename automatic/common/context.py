@@ -1,18 +1,15 @@
 
 
-
+import time
 from abc import ABC, abstractmethod
 from .descriptor import Descriptor
 
-class Context(ABC):
-    @abstractmethod
-    def activate(self, desc:Descriptor):
-        pass
+class Context():
+    def __init__(self):
+        self.__differ = 0
 
-    @abstractmethod
-    def click(self, desc:Descriptor):
-        pass
-
-    @abstractmethod
-    def type(self, desc:Descriptor, text:str):
-        pass
+    def wait(self, desc: Descriptor):
+        differ = desc.differ()
+        differ = differ if differ else self.__differ
+        if differ != 0:
+            time.sleep(differ)

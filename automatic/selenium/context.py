@@ -14,8 +14,9 @@ from selenium.webdriver.support import expected_conditions as EC
 # types
 from typing import Union, List
 
-from .elements import Descriptor, is_alert, is_element, is_window, is_default_frame
+from .elements import *
 from ..common import wait
+import automatic.common as common
 from ..common.exceptions import *
 import time
 
@@ -29,7 +30,7 @@ from io import StringIO
 def get_or(a, b) -> int:
     return a if a else b
 
-class Context:
+class Context(common.Context):
     def __init__(self, driver: WebDriver, *, timeout, differ):
         self.__driver = driver
         self.__current_frame = None
@@ -92,7 +93,7 @@ class Context:
             current = driver.current_window_handle
             result = None
             handles = driver.window_handles
-            handles.remove(current)
+            # handles.remove(current)
             for handle in handles:
                 driver.switch_to.window(handle)
                 if driver.title.find(title) >= 0:
@@ -107,7 +108,7 @@ class Context:
             current = driver.current_window_handle
             result = None
             handles = driver.window_handles
-            handles.remove(current)
+            # handles.remove(current)
             for handle in handles:
                 driver.switch_to.window(handle)
                 if driver.current_url.find(url) >= 0:
@@ -163,43 +164,42 @@ class Context:
 # ----- UTILITY -------
 # ---------------------
 
-    def __differ_time(self, desc: Descriptor):
-        differ = desc.differ()
-        differ = differ if differ else self.__differ
-        if differ != 0:
-            time.sleep(differ)
+    
 
     def __activate(self, desc: Descriptor):
         if not desc:
-            return False
+            return
 
         # activate a parent
         parent = desc.parent()
         if parent:
-            if not self.__activate(parent):
-                # Error: Parent Activation
-                return False
+            self.__activate(parent)
+               
 
         # parent: Default frame
         if is_default_frame(desc):
+            self.set_default_window()
             self.set_default_frame()
-            return True
+            return
 
         # get element
         elem = self.get(desc)
         if not elem:
-            # Error: Element Not found
-            return False
+            raise ElementNotFoundException(desc, "activate")
 
         # parent: Window
         if is_window(desc):
             self.set_current_window(elem)
-        elif isinstance(elem, WebElement) and elem.tag_name.lower() in ["frame", "iframe"]:
-            self.set_current_frame(elem)
+        elif isinstance(elem, WebElement):
+            if elem.tag_name.lower() in ["frame", "iframe"]:
+                if not desc.parent():
+                    self.set_default_window()
+                self.set_current_frame(elem)
+                
         else:
-            # Error: NotSupportedOperation
-            pass
-        return True
+            raise InvalidOperationException(desc, "activate")
+
+        
 
     def __type(self, element: WebElement, text: str):
         element.clear()
@@ -221,12 +221,15 @@ class Context:
 # ----------------------
 # ------ CLICKS --------
 # ----------------------
-
+    def __differ_time(self, desc: Descriptor):
+        differ = desc.differ()
+        differ = differ if differ else self.__differ
+        if differ != 0:
+            time.sleep(differ)
    
 
     def click(self, descriptor:Descriptor):
-        if not self.__activate(descriptor):
-            raise ActivationFailureException(descriptor)
+        self.__activate(descriptor)
        
         elem = self.get(descriptor)
         if not elem:
@@ -242,8 +245,7 @@ class Context:
 
     def clicks(self, descriptor:Descriptor, *, num_samples=0):
         # activate
-        if not self.__activate(descriptor):
-           raise ActivationFailureException(descriptor)
+        self.__activate(descriptor)
 
         # get all elements
         elems = self.get_all(descriptor)
@@ -265,8 +267,8 @@ class Context:
 # ---------------------
     def type(self, desc:Descriptor, text):
         # activate
-        if not self.__activate(desc):
-            raise ActivationFailureException(desc)
+        self.__activate(desc)
+
 
         elem = self.get(desc)
         if not elem:
@@ -284,8 +286,7 @@ class Context:
         return pd.read_html(StringIO(elem.get_attribute('outerHTML')))[0]
 
     def table(self, desc:Descriptor):
-        if not self.__activate(desc):
-            raise ActivationFailureException(desc)
+        self.__activate(desc)
         
         elem = self.get(desc)
         if not elem:
@@ -309,8 +310,8 @@ class Context:
     
     def select(self, desc:Descriptor, text):
          # activate
-        if not self.__activate(desc):
-            raise ActivationFailureException(desc)
+        self.__activate(desc)
+
 
         elem = self.get(desc)
         if not elem:
@@ -323,22 +324,29 @@ class Context:
         if not self.__select(elem, text):
             return OperationFailureException(desc, "select")
 
+
+    def accept(self, desc: Descriptor):
+        if not desc:
+            raise Exception("Descriptor should not be none")
+        elem = self.get(desc)
+        if not elem:
+            raise ElementNotFoundException(desc, "accept")
+        elem.accept()
+    
+
     def execute_script(self, script, element):
         if not (script and element):
             return False
         self.__driver.execute_script(script, element)
         return True
 
-   
 
-    def accept(self, element):
-        if not element:
-            return False
+    def go(self, target:Url):
+        if not target.parent():
+            self.set_default_window()
         else:
-            element.accept()
-            return True
-
-    def go(self, target):
+            self.__activate(target.parent())
+        
         if target.by() == "url": 
             self.__driver.get(target.path())
             return True
@@ -350,9 +358,20 @@ class Context:
         return self.__driver.current_url
 
     def set_current_window(self, handle):
-        if self.__driver.current_window_handle == handle:
-            return
+        try:
+            if self.__driver.current_window_handle == handle:
+                return
+        except:
+            pass
         self.__driver.switch_to.window(handle)
+
+    def set_default_window(self):
+        try:
+            if self.__driver.current_window_handle == self.__default_window_handle:
+                return
+        except:
+            pass
+        self.__driver.switch_to.window(self.__default_window_handle)
 
     def set_current_frame(self, frame: WebElement):
         if frame:
@@ -364,11 +383,17 @@ class Context:
     def set_default_frame(self):
         self.__driver.switch_to.default_content()
 
-
     def get_current_frame(self):
         return self.__current_frame
 
-
-
-
-
+    def exist(self, desc: Descriptor) -> bool:
+        """ 
+        Special case not to rasie exception. So need to call lower-level APIs
+        """
+        if desc.parent():
+            if not self.exist(desc.parent()):
+                return False
+            self.__activate(desc.parent())
+                
+        elem = self.get(desc)
+        return True if elem else False

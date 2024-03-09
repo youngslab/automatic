@@ -36,6 +36,7 @@ class ElementNotFoundException(Exception):
     def __init__(self, desc: Descriptor, op ,message="Element is not Found."):
         self.message = message
         self.desc = desc
+        self.op = op
         super().__init__(self.message)
 
     def __str__(self):

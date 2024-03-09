@@ -4,71 +4,28 @@ import pyautogui
 import pyperclip
 import autoit
 
-import time
-import os, sys
-current_dir = os.path.dirname(os.path.abspath(__file__))
-parent_dir = os.path.dirname(current_dir)
-root_dir = os.path.dirname(parent_dir)
-sys.path.insert(0, root_dir)
-import auto_v2.common as common
+from automatic.common import Descriptor
+import automatic.common as common
+from automatic.common.exceptions import *
+from automatic.win32.elements import Image, is_window, Control, Title
 
-from .elements import Image, is_window,Control
+from typing import Union
+from pyscreeze import Point
 
+def get_or(a, b) -> int:
+    return a if a else b
 
 class Context(common.Context):
-    def __init__(self,* ,timeout=60, differ=0, default_confidence=.9, default_grayscale=True):
+    def __init__(self,* ,timeout=60, differ=0, confidence=.9, grayscale=True):
         self.__timeout = timeout 
-        self.default_confidence = default_confidence
-        self.default_grayscale = default_grayscale
+        self.__differ = differ
+        self.__confidence = confidence
+        self.__grayscale = grayscale
 
-
-    def activate(self, desc:common.Descriptor):
-        if not desc:
-            return False
-
-        elem = self.get(desc)
-
-        if is_window(desc):
-            return self.__activate_window(elem, desc.timeout())
-        else:
-            # NotSupportedOperation
-            return True
-
-    def get(self, desc:common.Descriptor):
-        timeout = desc.timeout()
-        timeout = timeout if timeout else self.__timeout
-
-        if isinstance(desc, Image):
-            return self.get_position(desc.path(), timeout, desc.confidence(), desc.grayscale())
-
-        if isinstance(desc, Control):
-            return { "window": desc.parent.path(), "control": desc.path() }
-
-        return None
-
-
-    def click2(self, elem):
-
-        if isinstance(elem, Position):
-            pyautogui.click(elem)
-
-
-    def 
-
-    def get_position(self, img, timeout, confidence, grayscale):
-        """
-        Get a center position of the image
-        """
-        return common.wait(lambda: pyautogui.locateCenterOnScreen(
-            self.img, grayscale=grayscale, confidence=confidence), timeout=timeout)
-
-    def wait_no_image(self, img, timeout, confidence, grayscale) -> bool:
-        """
-        Wait until the image disappears
-        """
-        return common.wait(lambda: pyautogui.locateCenterOnScreen(
-            self.img, grayscale=grayscale, confidence=confidence) is None, timeout=timeout)
-
+# ---------------------
+# ----- Activate ------
+# ---------------------
+        
     def __activate_window(self, window, timeout):
         """
         Using Autoit APIs, wait until a window activated.
@@ -88,113 +45,83 @@ class Context(common.Context):
 
         return autoit.win_active(window)
 
-    def click(self, pos):
+    def __activate(self, desc: Descriptor):
+        if not desc:
+            raise Exception("Descriptor should not be none")
+        
+        # activate a parent
+        parent = desc.parent()
+        if parent:
+            self.__activate(parent)
+
+        elem = self.get(desc)
+        if not elem:
+            raise ElementNotFoundException(desc, "activate")
+
+        if is_window(desc):
+            timeout = get_or(desc.timeout(), self.__timeout)
+            self.__activate_window(elem, timeout)
+
+
+    def get_position(self, desc:Image) -> Union[Point, None]:
+        """
+        Get a center position of the image
+        """
+        timeout = get_or(desc.timeout(), self.__timeout)
+        return common.wait(lambda: pyautogui.locateCenterOnScreen(
+           desc.path(), grayscale=desc.grayscale(), confidence=desc.confidence()), timeout=timeout)
+
+
+    def get(self, desc:Descriptor):
+        if isinstance(desc, Image):
+            return self.get_position(desc)
+
+        if isinstance(desc, Control):
+            return desc
+        
+        if isinstance(desc, Title):
+            return desc.path()
+
+        return None
+
+# ---------------------
+# ----- UTILITY -------
+# ---------------------
+    
+    def click(self, desc: Descriptor):
+        self.__activate(desc)
+
+        elem = self.get(desc)
+        if not elem:
+            raise ElementNotFoundException(desc, "click")
+
+        self.wait(desc)
+
+        if isinstance(elem, Point):
+            self.__click_point(elem)
+        elif isinstance(elem, Control):
+            self.__click_control(elem)
+        else:
+            raise InvalidOperationException(desc, "click")
+
+    def __click_control(self, ctrl: Control):
+        if not ctrl:
+            return
+        
+        parent = ctrl.parent()
+        if not parent:
+            raise Exception(f"Control should have parent. {ctrl}")
+        
+        autoit.control_click(parent.path(), ctrl.path())
+
+
+    def __click_point(self, pos: Point):
         if pos is None:
-            print(f"Can't click a empty position")
-            return False
+            return
 
         pyautogui.click(pos)
-        return True
 
-    def type(self, pos, text: str, differed=1):
-        if self.click(pos):
-            return False
-
-        time.sleep(differed)
+    def type(self, desc: Descriptor, text):
+        self.click(desc)
         pyautogui.typewrite(text)
-        return True
-
-
-class ControlElement:
-    """
-    autoit's wapper 
-    """
-
-    def __init__(self, context: Context, window, contorl):
-        self.context = context
-        self.window = window
-        self.contorl = contorl
-
-    def do(self, func, *, timeout=None, differed=None):
-        if timeout is None:
-            timeout = self.context.default_timeout
-
-        if differed is None:
-            differed = self.context.default_differed
-
-        if self.context.activate(self.window, timeout=timeout):
-            print(f"ERROR: Failed to activate window. {self.window}")
-            return False
-
-        if differed:
-            time.sleep(differed)
-
-        return func()
-
-    def click(self, *, timeout=None, differed=None):
-        if not self.do(lambda: autoit.control_click(self.window, self.contorl),
-                       timeout=timeout, differed=differed):
-            print(
-                f"ERROR: Failed to click an element. window={self.window}, element={self.element}")
-            return False
-        return True
-
-    def type(self, text, *, timeout=None, differed=None):
-        if not self.do(lambda: autoit.control_set_text(self.window, self.contorl, text),
-                       timeout=timeout, differed=differed):
-            print(
-                f"ERROR: Failed to type an element. window={self.window}, element={self.element}")
-            return False
-        return True
-
-
-class ImageElement:
-
-    def __init__(self, func, context: Context, window, image):
-        self.context = context
-        self.window = window
-        self.image = image
-
-    def do(self, func, *, timeout=None, differed=None, grayscale=None, confidence=None):
-        if timeout is None:
-            timeout = self.context.default_timeout
-
-        if differed is None:
-            differed = self.context.default_differed
-
-        if grayscale is None:
-            grayscale = self.context.default_grayscale
-
-        if confidence is None:
-            confidence = self.context.default_confidence
-
-        if self.context.activate(self.window, timeout=timeout):
-            print(f"ERROR: Failed to activate window. {self.window}")
-            return False
-
-        position = self.context.get_position(self.image)
-        if not position:
-            print(f"ERROR: Failed to find an image position. {self.image}")
-            return False
-
-        if differed:
-            time.sleep(differed)
-
-        return func(position)
-
-    def click(self, *, timeout=None, differed=None, grayscale=None, confidence=None):
-        if not self.do(lambda pos: self.context.click(pos),
-                       timeout=timeout, differed=differed,
-                       grayscale=grayscale, confidence=confidence):
-            print(f"ERROR: Failed to click an element. img={self.image}")
-            return False
-        return True
-
-    def type(self, text, *, timeout=None, differed=None, grayscale=None, confidence=None):
-        if not self.do(lambda pos: self.context.type(pos, text),
-                       timeout=timeout, differed=differed,
-                       grayscale=grayscale, confidence=confidence):
-            print(f"ERROR: Failed to type an element. img={self.image}")
-            return False
-        return True
 

@@ -1,7 +1,9 @@
 
 from .common import Descriptor
+from automatic.common.exceptions import *
 from .common.utils import package_name
 from .utils.logger import get_logger
+import pandas as pd
 
 logger = get_logger()
 
@@ -22,8 +24,7 @@ class Automatic:
             return False
         op = getattr(context, op, None)
         if not op:
-            # NotSupportedOperation
-            return False
+            raise Exception(f"Context can not support op:{op}")
 
         return op(*args, **kwargs)
 
@@ -32,9 +33,8 @@ class Automatic:
         logger.debug(f"{op} on {desc}")
         ctx = self._context(desc)
         if not ctx:
-            # NoContextException
-            return False
-
+            raise Exception(f"Context cannot support type{type(desc)} of desc({desc})")
+            
         # Run operation in a context
         return self._dispatch(ctx, op, desc, *args, **kwargs)
 
@@ -49,7 +49,7 @@ class Automatic:
         # Run operation in a context
         return self._dispatch(ctx, op, desc, *args, **kwargs)
 
-    def exist(self, desc: Descriptor):
+    def exist(self, desc: Descriptor) -> bool:
         return self._do("exist", desc)
 
     def go(self, desc: Descriptor):
@@ -64,7 +64,7 @@ class Automatic:
     def type(self, desc: Descriptor, text):
         return self._do("type", desc, text)
 
-    def table(self, desc: Descriptor):
+    def table(self, desc: Descriptor) -> pd.DataFrame:
         return self._get("table", desc)
 
     def accept(self, target: Descriptor):
