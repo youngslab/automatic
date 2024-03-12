@@ -27,8 +27,10 @@ import random
 import pandas as pd
 from io import StringIO
 
+
 def get_or(a, b) -> int:
     return a if a else b
+
 
 class Context(common.Context):
     def __init__(self, driver: WebDriver, *, timeout, differ):
@@ -38,20 +40,20 @@ class Context(common.Context):
         self.__timeout = timeout
         self.__differ = differ
 
-
-    def get(self, desc:Descriptor) :
+    def get(self, desc: Descriptor):
         if is_element(desc):
             return self.get_element(desc)
         elif is_window(desc):
             return self.get_window_handle(desc)
         elif is_alert(desc):
             return self.get_alert(desc)
+        elif is_default_frame(desc):
+            return desc
         else:
             # TODO: exception
             return None
 
-
-    def get_all(self, desc:Descriptor) :
+    def get_all(self, desc: Descriptor):
         if is_element(desc):
             return self.get_elements(desc)
         else:
@@ -71,9 +73,9 @@ class Context(common.Context):
         timeout = get_or(desc.timeout(), self.__timeout)
         try:
             return WebDriverWait(self.__driver, timeout).until(
-                                lambda d: [element for element in
-                                           d.find_elements(desc.by(), desc.path()) 
-                                if element.is_displayed() and element.is_enabled()])
+                lambda d: [element for element in
+                           d.find_elements(desc.by(), desc.path())
+                           if element.is_displayed() and element.is_enabled()])
         except Exception as e:
             # print(f"ERROR: Failed to get elements. {e}")
             return []
@@ -133,8 +135,7 @@ class Context(common.Context):
             self.__driver.close()
         self.__driver.switch_to.window(current)
 
-
-    def get_alert(self, desc:Descriptor):
+    def get_alert(self, desc: Descriptor):
         timeout = get_or(desc.timeout(), self.__timeout)
         try:
             WebDriverWait(self.__driver, timeout).until(
@@ -148,10 +149,8 @@ class Context(common.Context):
             # print(f"ERROR: Failed to get an alert. {e}")
             return None
 
-
     def get_default_window_handle(self):
         return self.__default_window_handle
-
 
     def get_text(self, element) -> str:
         if isinstance(element, WebElement):
@@ -164,8 +163,6 @@ class Context(common.Context):
 # ----- UTILITY -------
 # ---------------------
 
-    
-
     def __activate(self, desc: Descriptor):
         if not desc:
             return
@@ -174,7 +171,6 @@ class Context(common.Context):
         parent = desc.parent()
         if parent:
             self.__activate(parent)
-               
 
         # parent: Default frame
         if is_default_frame(desc):
@@ -195,11 +191,9 @@ class Context(common.Context):
                 if not desc.parent():
                     self.set_default_window()
                 self.set_current_frame(elem)
-                
+
         else:
             raise InvalidOperationException(desc, "activate")
-
-        
 
     def __type(self, element: WebElement, text: str):
         element.clear()
@@ -221,16 +215,17 @@ class Context(common.Context):
 # ----------------------
 # ------ CLICKS --------
 # ----------------------
+
+
     def __differ_time(self, desc: Descriptor):
         differ = desc.differ()
         differ = differ if differ else self.__differ
         if differ != 0:
             time.sleep(differ)
-   
 
-    def click(self, descriptor:Descriptor):
+    def click(self, descriptor: Descriptor):
         self.__activate(descriptor)
-       
+
         elem = self.get(descriptor)
         if not elem:
             raise ElementNotFoundException(descriptor, "click")
@@ -243,7 +238,7 @@ class Context(common.Context):
         if not self.__click(elem):
             return OperationFailureException(descriptor, "click")
 
-    def clicks(self, descriptor:Descriptor, *, num_samples=0):
+    def clicks(self, descriptor: Descriptor, *, num_samples=0):
         # activate
         self.__activate(descriptor)
 
@@ -265,10 +260,9 @@ class Context(common.Context):
 # ---------------------
 # ------ TYPES --------
 # ---------------------
-    def type(self, desc:Descriptor, text):
+    def type(self, desc: Descriptor, text):
         # activate
         self.__activate(desc)
-
 
         elem = self.get(desc)
         if not elem:
@@ -280,20 +274,19 @@ class Context(common.Context):
         self.__differ_time(desc)
         if not self.__type(elem, text):
             return OperationFailureException(desc, "click")
-        
 
-    def __table(self, elem:WebElement) :
+    def __table(self, elem: WebElement):
         return pd.read_html(StringIO(elem.get_attribute('outerHTML')))[0]
 
-    def table(self, desc:Descriptor):
+    def table(self, desc: Descriptor):
         self.__activate(desc)
-        
+
         elem = self.get(desc)
         if not elem:
             raise ElementNotFoundException(desc, "table")
-        
+
         # TODO: validate its tag is table
-        
+
         self.__differ_time(desc)
         return self.__table(elem)
 
@@ -307,11 +300,10 @@ class Context(common.Context):
             return False
         select.select_by_visible_text(text)
         return True
-    
-    def select(self, desc:Descriptor, text):
-         # activate
-        self.__activate(desc)
 
+    def select(self, desc: Descriptor, text):
+        # activate
+        self.__activate(desc)
 
         elem = self.get(desc)
         if not elem:
@@ -324,7 +316,6 @@ class Context(common.Context):
         if not self.__select(elem, text):
             return OperationFailureException(desc, "select")
 
-
     def accept(self, desc: Descriptor):
         if not desc:
             raise Exception("Descriptor should not be none")
@@ -332,7 +323,6 @@ class Context(common.Context):
         if not elem:
             raise ElementNotFoundException(desc, "accept")
         elem.accept()
-    
 
     def execute_script(self, script, element):
         if not (script and element):
@@ -340,14 +330,13 @@ class Context(common.Context):
         self.__driver.execute_script(script, element)
         return True
 
-
-    def go(self, target:Url):
+    def go(self, target: Url):
         if not target.parent():
             self.set_default_window()
         else:
             self.__activate(target.parent())
-        
-        if target.by() == "url": 
+
+        if target.by() == "url":
             self.__driver.get(target.path())
             return True
         else:
@@ -394,6 +383,25 @@ class Context(common.Context):
             if not self.exist(desc.parent()):
                 return False
             self.__activate(desc.parent())
-                
+
         elem = self.get(desc)
         return True if elem else False
+
+    def count(self, desc: Descriptor) -> int:
+        """
+        return How many elements for the descriptor
+        """
+        self.__activate(desc)
+
+        elems = self.get_all(desc)
+        return len(elems)
+
+    def text(self, desc: Descriptor) -> str:
+        self.__activate(desc)
+
+        elem = self.get(desc)
+        if not elem:
+            raise ElementNotFoundException(desc, "text")
+
+        self.__differ_time(desc)
+        return elem.text

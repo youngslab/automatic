@@ -33,8 +33,10 @@ class Automatic:
         logger.debug(f"{op} on {desc}")
         ctx = self._context(desc)
         if not ctx:
-            raise Exception(f"Context cannot support type{type(desc)} of desc({desc})")
-            
+            # fmt: off
+            raise Exception(f"Context cannot support type {type(desc)} of desc({desc})")
+            # fmt: on
+
         # Run operation in a context
         return self._dispatch(ctx, op, desc, *args, **kwargs)
 
@@ -58,6 +60,9 @@ class Automatic:
     def click(self, target: Descriptor):
         return self._do("click", target)
 
+    def text(self, target: Descriptor):
+        return self._do("text", target)
+
     def clicks(self, target: Descriptor, *, num_samples=None):
         return self._do("clicks", target, num_samples=num_samples)
 
@@ -72,3 +77,6 @@ class Automatic:
 
     def select(self, target: Descriptor, text: str):
         return self._do("select", target, text)
+
+    def count(self, desc: Descriptor) -> int:
+        return self._do("count", desc)
