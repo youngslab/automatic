@@ -33,7 +33,7 @@ class OperationFailureException(Exception):
      
 
 class ElementNotFoundException(Exception):
-    def __init__(self, desc: Descriptor, op ,message="Element is not Found."):
+    def __init__(self, desc: Descriptor, op , message="Element is not Found."):
         self.message = message
         self.desc = desc
         self.op = op

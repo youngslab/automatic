@@ -6,10 +6,10 @@ from typing import Union
 # Element Descriptor
 class Image(Descriptor):
     def __init__(self, desc, path, *, parent: 'Union[None, Descriptor]' =None,
-                 timeout=None, confidence=None, grayscale=None):
+                 timeout=None,differ=None, confidence=None, grayscale=None):
         self.__confidence = confidence
         self.__grayscale = grayscale
-        super().__init__(desc, path, parent=parent, timeout=timeout)
+        super().__init__(desc, path, parent=parent, timeout=timeout, differ=differ)
 
 
     def by(self) -> str:

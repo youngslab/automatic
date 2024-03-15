@@ -44,7 +44,11 @@ def wait(func, *, timeout, interval=0.5):
     while True:
         curr = time.time() - start
         retry = retry + 1
-        res = func()
+        try:
+            res = func()
+        except Exception as e:
+            res = None
+
         if res != None and res != 0:
             return res
 
