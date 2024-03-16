@@ -30,6 +30,10 @@ class Title(Descriptor):
     def by(self) -> str:
         return "title"
 
+class Text(Descriptor):
+    def by(self) -> str:
+        return "text"
+
 
 def is_window(desc:Descriptor):
     return True if desc.by() in ["title"] else False

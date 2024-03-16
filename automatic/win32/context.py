@@ -3,11 +3,13 @@
 import pyautogui
 import pyperclip
 import autoit
+import pytesseract
+from PIL import ImageGrab
 
 from automatic.common import Descriptor
 import automatic.common as common
 from automatic.common.exceptions import *
-from automatic.win32.elements import Image, is_window, Control, Title
+from automatic.win32.elements import Image, is_window, Control, Title, Text
 
 from typing import Union
 from pyscreeze import Point
@@ -71,6 +73,37 @@ class Context(common.Context):
         return common.wait(lambda: pyautogui.locateCenterOnScreen(
            desc.path(), grayscale=desc.grayscale(), confidence=desc.confidence()), timeout=timeout)
 
+    def get_position_from_text(self, desc:Text) -> Union[Point, None]:
+        """
+        Get a center of the text
+        """
+        timeout = get_or(desc.timeout(), self.__timeout)
+        parent = desc.parent()
+        if not parent:
+            raise Exception("Descriptor should not be none")
+        if not isinstance(parent, Title):
+            raise Exception("Parent should be Title object")
+
+        # To make sure that tesseract installed. Otherwise, it raise exception.
+        _ = pytesseract.get_tesseract_version()
+
+        def _get_position(title, text):
+            # 1. windows coordinate
+            bbox = autoit.win_get_pos(title)
+            # 2. capture
+            screenshot = ImageGrab.grab(bbox=bbox) # (left, top, right, bottom)
+            # 3. ocr
+            pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+            data = pytesseract.image_to_data(screenshot, output_type=pytesseract.Output.DICT)
+            # 4. get position
+            for i, word in enumerate(data['text']):
+                if word == desc.path():
+                    x = data['left'][i] + data['width'][i] / 2
+                    y = data['top'][i] + data['height'][i] / 2
+                    return Point(bbox[0] + x, bbox[1] + y)
+            return None
+
+        return common.wait(lambda: _get_position(parent.path(), desc.path()), timeout=timeout)
 
     def get(self, desc:Descriptor):
         if isinstance(desc, Image):
@@ -81,6 +114,9 @@ class Context(common.Context):
         
         if isinstance(desc, Title):
             return desc.path()
+
+        if isinstance(desc, Text):
+            return self.get_position_from_text(desc)
 
         return None
 
@@ -107,7 +143,7 @@ class Context(common.Context):
     def __click_control(self, ctrl: Control):
         if not ctrl:
             return
-        
+
         parent = ctrl.parent()
         if not parent:
             raise Exception(f"Control should have parent. {ctrl}")
@@ -118,7 +154,6 @@ class Context(common.Context):
     def __click_point(self, pos: Point):
         if pos is None:
             return
-
         pyautogui.click(pos)
 
     def type(self, desc: Descriptor, text):

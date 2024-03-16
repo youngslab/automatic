@@ -3,3 +3,5 @@ webdriver-manager
 lxml
 pandas
 autoit
+pytesseract
+pillow
