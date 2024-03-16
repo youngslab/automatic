@@ -1,21 +1,15 @@
 
 import logging
 
-AUTOMATIC_LOGGER_NAME = "Automatic"
+class Logger:
+    def __init__(self, name, loglevel=logging.INFO):
+        self.logger = logging.getLogger(name)
+        self.logger.setLevel(loglevel)
+        self.logger.handlers.clear()
 
-
-def init_logger(loglevel=logging.INFO):
-    logger = logging.getLogger(AUTOMATIC_LOGGER_NAME)
-    logger.setLevel(loglevel)
-    logger.handlers.clear()
-
-    ch = logging.StreamHandler()
-    ch.setLevel(loglevel)  # handler의 레벨도 DEBUG로 설정
-    formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    ch.setFormatter(formatter)
-    logger.addHandler(ch)
-
-
-def get_logger():
-    return logging.getLogger(AUTOMATIC_LOGGER_NAME)
+        ch = logging.StreamHandler()
+        ch.setLevel(loglevel)  # handler의 레벨도 DEBUG로 설정
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        ch.setFormatter(formatter)
+        self.logger.addHandler(ch)
