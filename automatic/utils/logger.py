@@ -1,15 +1,24 @@
 
 import logging
 
+LOGGER_AUTOMATIC = "Automatic"
+LOGGER_SELENIUM = "Selenium"
+LOGGER_WIN32 = "Win32"
+
 class Logger:
-    def __init__(self, name, loglevel=logging.INFO):
-        self.logger = logging.getLogger(name)
-        self.logger.setLevel(loglevel)
-        self.logger.handlers.clear()
+    @classmethod
+    def init(cls, name, level):
+        logger = logging.getLogger(name)
+        logger.setLevel(level)
+        logger.handlers.clear()
 
         ch = logging.StreamHandler()
-        ch.setLevel(loglevel)  # handler의 레벨도 DEBUG로 설정
+        ch.setLevel(level)  # handler의 레벨도 DEBUG로 설정
         formatter = logging.Formatter(
             '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         ch.setFormatter(formatter)
-        self.logger.addHandler(ch)
+        logger.addHandler(ch)
+
+    @classmethod
+    def get(cls, name):
+        return logging.getLogger(name)
