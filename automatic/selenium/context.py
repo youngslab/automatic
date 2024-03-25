@@ -63,8 +63,12 @@ class Context(common.Context):
     def get_element(self, desc: Descriptor) -> Union[WebElement, None]:
         timeout = get_or(desc.timeout(), self.__timeout)
         try:
-            return WebDriverWait(self.__driver, timeout).until(
-                EC.element_to_be_clickable((desc.by(), desc.path())))
+            if hasattr(desc, 'visible') and not desc.visible:
+                return WebDriverWait(self.__driver, timeout).until(
+                    lambda d: d.find_element(desc.by(), desc.path()))
+            else:
+                return WebDriverWait(self.__driver, timeout).until(
+                    EC.element_to_be_clickable((desc.by(), desc.path())))
         except Exception as e:
             # print(f"ERROR: Failed to get an element. {e}")
             return None
@@ -75,9 +79,10 @@ class Context(common.Context):
             return WebDriverWait(self.__driver, timeout).until(
                 lambda d: [element for element in
                            d.find_elements(desc.by(), desc.path())
-                           if element.is_displayed() and element.is_enabled()])
+                           if element.is_displayed() and element.is_enabled()
+                            ])
         except Exception as e:
-            # print(f"ERROR: Failed to get elements. {e}")
+            # print(f"ERROR: Failed to get elements.{type(e)} {e}")
             return []
 
     def get_window_handle(self, desc: Descriptor):
@@ -89,10 +94,17 @@ class Context(common.Context):
         else:
             # TODO: report failure
             return None
+        
+    def __get_current_window_handle(self):
+        try:
+            return self.__driver.current_window_handle
+        except:
+            self.set_default_window()
+            return self.__driver.current_window_handle
 
     def __get_window_handle_with_title(self, title, timeout):
         def _get_window_handle(driver: WebDriver, title: str):
-            current = driver.current_window_handle
+            current = self.__get_current_window_handle()
             result = None
             handles = driver.window_handles
             # handles.remove(current)
@@ -107,7 +119,7 @@ class Context(common.Context):
 
     def __get_window_handle_with_url(self, url, timeout):
         def _get_window_handle(driver: WebDriver, title: str):
-            current = driver.current_window_handle
+            current = self.__get_current_window_handle()
             result = None
             handles = driver.window_handles
             # handles.remove(current)
@@ -162,15 +174,23 @@ class Context(common.Context):
 # ---------------------
 # ----- UTILITY -------
 # ---------------------
+        
+    def __activate_window(self, desc):
+        handle = self.get_window_handle(desc)
+        self.set_current_window(handle)
 
-    def __activate(self, desc: Descriptor):
+
+    def __activate(self, desc: Descriptor, isParent=False):
         if not desc:
             return
 
         # activate a parent
         parent = desc.parent()
         if parent:
-            self.__activate(parent)
+            self.__activate(parent, True)
+
+        if not isParent:
+            return 
 
         # parent: Default frame
         if is_default_frame(desc):
@@ -185,7 +205,7 @@ class Context(common.Context):
 
         # parent: Window
         if is_window(desc):
-            self.set_current_window(elem)
+            self.__activate_window(desc)
         elif isinstance(elem, WebElement):
             if elem.tag_name.lower() in ["frame", "iframe"]:
                 if not desc.parent():
@@ -196,11 +216,24 @@ class Context(common.Context):
             raise InvalidOperationException(desc, "activate")
 
     def __type(self, element: WebElement, text: str):
-        element.clear()
-        if element.get_attribute('value'):
+        # if not 
+        try:
+            element.clear()
+        except Exception as e:
+            pass
+            
+        # if element.get_attribute('value'):
+        #     return False
+        try:
+            element.send_keys(text)
+            return True
+        except:
+            pass 
+        try:
+            self.__driver.execute_script(f'arguments[0].value = "{text}"', element)
+            return True
+        except:
             return False
-        element.send_keys(text)
-        return True
 
     def __click(self, element: WebElement):
         if not self.__driver or not element:
@@ -231,14 +264,14 @@ class Context(common.Context):
             raise ElementNotFoundException(descriptor, "click")
 
         if not isinstance(elem, WebElement):
-            return InvalidOperationException(descriptor, "click")
+            raise InvalidOperationException(descriptor, "click")
 
         self.__differ_time(descriptor)
 
         if not self.__click(elem):
-            return OperationFailureException(descriptor, "click")
+            raise OperationFailureException(descriptor, "click")
 
-    def clicks(self, descriptor: Descriptor, *, num_samples=0):
+    def clicks(self, descriptor: Descriptor, *, num_samples=None):
         # activate
         self.__activate(descriptor)
 
@@ -248,14 +281,15 @@ class Context(common.Context):
             raise ElementNotFoundException(descriptor, "click")
 
         # sample
-        elems = random.sample(elems, k=num_samples)
+        if num_samples:
+            elems = random.sample(elems, k=num_samples)
 
         # execution
         for elem in elems:
             # differ
             self.__differ_time(descriptor)
             if not self.__click(elem):
-                return OperationFailureException(descriptor, "click")
+                raise OperationFailureException(descriptor, "click")
 
 # ---------------------
 # ------ TYPES --------
@@ -273,7 +307,7 @@ class Context(common.Context):
 
         self.__differ_time(desc)
         if not self.__type(elem, text):
-            return OperationFailureException(desc, "click")
+            raise OperationFailureException(desc, "click")
 
     def __table(self, elem: WebElement):
         return pd.read_html(StringIO(elem.get_attribute('outerHTML')))[0]
@@ -324,6 +358,7 @@ class Context(common.Context):
             raise ElementNotFoundException(desc, "accept")
         elem.accept()
 
+
     def execute_script(self, script, element):
         if not (script and element):
             return False
@@ -334,7 +369,7 @@ class Context(common.Context):
         if not target.parent():
             self.set_default_window()
         else:
-            self.__activate(target.parent())
+            self.__activate(target.parent(), True)
 
         if target.by() == "url":
             self.__driver.get(target.path())
@@ -367,34 +402,40 @@ class Context(common.Context):
             self.__current_frame = frame
             self.__driver.switch_to.frame(frame)
         else:
+            self.__current_frame = None
             self.__driver.switch_to.default_content()
 
     def set_default_frame(self):
-        self.__driver.switch_to.default_content()
-
-    def get_current_frame(self):
-        return self.__current_frame
+        if self.__current_frame:
+            self.__driver.switch_to.default_content()
 
     def exist(self, desc: Descriptor) -> bool:
         """ 
         Special case not to rasie exception. So need to call lower-level APIs
         """
-        if desc.parent():
-            if not self.exist(desc.parent()):
-                return False
-            self.__activate(desc.parent())
-
-        elem = self.get(desc)
-        return True if elem else False
+        try:
+            self.__activate(desc)
+            if isinstance(desc, Xpath) and desc.multiple:
+                elems = self.get_elements(desc)
+                return True if elems and len(elems) >= 0 else False
+            else:
+                elem = self.get(desc)
+                return True if elem else False
+        except:
+            return False
 
     def count(self, desc: Descriptor) -> int:
         """
         return How many elements for the descriptor
         """
-        self.__activate(desc)
-
-        elems = self.get_all(desc)
-        return len(elems)
+        try:
+            self.__activate(desc)
+            elems = self.get_all(desc)
+            return len(elems) if elems else 0
+        except Exception as e:
+            print(e)
+            return 0
+        
 
     def text(self, desc: Descriptor) -> str:
         self.__activate(desc)

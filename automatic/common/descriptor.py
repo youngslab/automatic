@@ -30,5 +30,5 @@ class Descriptor(ABC):
         return self.__differ
 
     def __str__(self):
-        return self.desc()
+        return f"{self.desc()}. path={self.path()}"
 

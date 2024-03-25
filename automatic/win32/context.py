@@ -5,6 +5,8 @@ import pyperclip
 import autoit
 import pytesseract
 from PIL import ImageGrab
+import cv2
+import numpy as np
 
 from automatic.common import Descriptor
 import automatic.common as common
@@ -70,8 +72,10 @@ class Context(common.Context):
         Get a center position of the image
         """
         timeout = get_or(desc.timeout(), self.__timeout)
+        grayscale = desc.grayscale() if desc.grayscale() else self.__grayscale
+        confidence = desc.confidence() if desc.confidence() else self.__confidence
         return common.wait(lambda: pyautogui.locateCenterOnScreen(
-           desc.path(), grayscale=desc.grayscale(), confidence=desc.confidence()), timeout=timeout)
+           desc.path(), grayscale=grayscale, confidence=confidence), timeout=timeout)
 
     def get_position_from_text(self, desc:Text) -> Union[Point, None]:
         """
@@ -85,19 +89,40 @@ class Context(common.Context):
             raise Exception("Parent should be Title object")
 
         # To make sure that tesseract installed. Otherwise, it raise exception.
-        _ = pytesseract.get_tesseract_version()
+        found = False
+        try:
+            _ = pytesseract.get_tesseract_version()
+            found = True
+        except:
+            pass
+
+        if not found:
+            try:
+                pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+                _ = pytesseract.get_tesseract_version()
+                found = True
+            except:
+                pass
+        
+        if not found:
+            raise Exception("tesseract is not found in your path. Please check your environment.")
 
         def _get_position(title, text):
             # 1. windows coordinate
             bbox = autoit.win_get_pos(title)
             # 2. capture
             screenshot = ImageGrab.grab(bbox=bbox) # (left, top, right, bottom)
-            # 3. ocr
-            pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-            data = pytesseract.image_to_data(screenshot, output_type=pytesseract.Output.DICT)
-            # 4. get position
+            # 3. preprocessing
+            # OpenCV는 BGR 색상 체계를 사용하므로 RGB로 변환
+            image_np = np.array(screenshot)
+            image_np = cv2.cvtColor(image_np, cv2.COLOR_BGR2RGB)
+            gray_image = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
+            # 4. ocr
+            config='-l kor+eng'
+            data = pytesseract.image_to_data(gray_image, config=config, output_type=pytesseract.Output.DICT)
+            # 5. get position
             for i, word in enumerate(data['text']):
-                if word == desc.path():
+                if word == text:
                     x = data['left'][i] + data['width'][i] / 2
                     y = data['top'][i] + data['height'][i] / 2
                     return Point(bbox[0] + x, bbox[1] + y)
