@@ -9,7 +9,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
 # exception
-# from selenium.common.exceptions import StaleElementReferenceException
+from selenium.common.exceptions import TimeoutException
 
 # types
 from typing import Union, List
@@ -27,10 +27,12 @@ import random
 import pandas as pd
 from io import StringIO
 
+from automatic.utils import Logger, LOGGER_AUTOMATIC
 
 def get_or(a, b) -> int:
     return a if a else b
 
+logger = Logger.get(LOGGER_AUTOMATIC)
 
 class Context(common.Context):
     def __init__(self, driver: WebDriver, *, timeout, differ):
@@ -69,8 +71,10 @@ class Context(common.Context):
             else:
                 return WebDriverWait(self.__driver, timeout).until(
                     EC.element_to_be_clickable((desc.by(), desc.path())))
+        except TimeoutException:
+            return None
         except Exception as e:
-            # print(f"ERROR: Failed to get an element. {e}")
+            logger.debug(f"ERROR: Failed to get an element. type={type(e)} e={e}")
             return None
 
     def get_elements(self, desc: Descriptor) -> List[WebElement]:
@@ -82,7 +86,7 @@ class Context(common.Context):
                            if element.is_displayed() and element.is_enabled()
                             ])
         except Exception as e:
-            # print(f"ERROR: Failed to get elements.{type(e)} {e}")
+            logger.debug(f"ERROR: Failed to get elements.{type(e)} {e}")
             return []
 
     def get_window_handle(self, desc: Descriptor):
@@ -310,7 +314,11 @@ class Context(common.Context):
             raise OperationFailureException(desc, "click")
 
     def __table(self, elem: WebElement):
-        return pd.read_html(StringIO(elem.get_attribute('outerHTML')))[0]
+        try:
+            return pd.read_html(StringIO(elem.get_attribute('outerHTML')))[0]
+        except ValueError as e:
+            logger.warning("Can't read table from given element. e={e}")
+            return None
 
     def table(self, desc: Descriptor):
         self.__activate(desc)
@@ -356,7 +364,9 @@ class Context(common.Context):
         elem = self.get(desc)
         if not elem:
             raise ElementNotFoundException(desc, "accept")
+        logger.debug(f"accept: {elem.text}")
         elem.accept()
+        
 
 
     def execute_script(self, script, element):
