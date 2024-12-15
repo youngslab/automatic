@@ -73,6 +73,9 @@ class Automatic:
 
     def accept(self, target: Descriptor):
         return self._do("accept", target)
+    
+    def dismiss(self, target: Descriptor):
+        return self._do("dismiss", target)
 
     def select(self, target: Descriptor, text: str):
         return self._do("select", target, text)

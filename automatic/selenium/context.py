@@ -367,7 +367,14 @@ class Context(common.Context):
         logger.debug(f"accept: {elem.text}")
         elem.accept()
         
-
+    def dismiss(self, desc: Descriptor):
+        if not desc:
+            raise Exception("Descriptor should not be none")
+        elem = self.get(desc)
+        if not elem:
+            raise ElementNotFoundException(desc, "dismiss")
+        logger.debug(f"dismiss: {elem.text}")
+        elem.dismiss()
 
     def execute_script(self, script, element):
         if not (script and element):
