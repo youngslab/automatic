@@ -69,22 +69,36 @@ class Context(common.Context):
                 return WebDriverWait(self.__driver, timeout).until(
                     lambda d: d.find_element(desc.by(), desc.path()))
             else:
-                return WebDriverWait(self.__driver, timeout).until(
-                    EC.element_to_be_clickable((desc.by(), desc.path())))
+                es = self.get_elements(desc)
+                if len(es) == 0:
+                    logger.debug("Failed to find an element")
+                    return None
+                elif len(es) > 1:
+                    logger.debug("Multiple items are found")
+                    return None
+                else:
+                    return es[0]
+                # return WebDriverWait(self.__driver, timeout).until(
+                #     EC.element_to_be_clickable((desc.by(), desc.path())))
         except TimeoutException:
             return None
         except Exception as e:
-            logger.debug(f"ERROR: Failed to get an element. type={type(e)} e={e}")
+            logger.debug(f"ERROR: Failed to get an element xx. type={type(e)} e={e}")
             return None
 
     def get_elements(self, desc: Descriptor) -> List[WebElement]:
         timeout = get_or(desc.timeout(), self.__timeout)
         try:
-            return WebDriverWait(self.__driver, timeout).until(
-                lambda d: [element for element in
-                           d.find_elements(desc.by(), desc.path())
-                           if element.is_displayed() and element.is_enabled()
-                            ])
+            if hasattr(desc, 'visible') and not desc.visible:
+                return WebDriverWait(self.__driver, timeout).until(
+                    lambda d: [element for element in
+                            d.find_elements(desc.by(), desc.path())])
+            else:    
+                return WebDriverWait(self.__driver, timeout).until(
+                    lambda d: [element for element in
+                            d.find_elements(desc.by(), desc.path())
+                            if element.is_displayed() and element.is_enabled()
+                                ])
         except Exception as e:
             logger.debug(f"ERROR: Failed to get elements.{type(e)} {e}")
             return []
@@ -261,6 +275,8 @@ class Context(common.Context):
             time.sleep(differ)
 
     def click(self, descriptor: Descriptor):
+        self.__differ_time(descriptor)
+
         self.__activate(descriptor)
 
         elem = self.get(descriptor)
@@ -269,13 +285,14 @@ class Context(common.Context):
 
         if not isinstance(elem, WebElement):
             raise InvalidOperationException(descriptor, "click")
-
-        self.__differ_time(descriptor)
-
+        
         if not self.__click(elem):
             raise OperationFailureException(descriptor, "click")
 
     def clicks(self, descriptor: Descriptor, *, num_samples=None):
+        
+        self.__differ_time(descriptor)
+
         # activate
         self.__activate(descriptor)
 
@@ -299,6 +316,8 @@ class Context(common.Context):
 # ------ TYPES --------
 # ---------------------
     def type(self, desc: Descriptor, text):
+        self.__differ_time(desc)
+
         # activate
         self.__activate(desc)
 
@@ -308,8 +327,7 @@ class Context(common.Context):
 
         if not isinstance(elem, WebElement):
             return False
-
-        self.__differ_time(desc)
+        
         if not self.__type(elem, text):
             raise OperationFailureException(desc, "click")
 
@@ -321,6 +339,8 @@ class Context(common.Context):
             return None
 
     def table(self, desc: Descriptor):
+        self.__differ_time(desc)
+
         self.__activate(desc)
 
         elem = self.get(desc)
@@ -328,8 +348,6 @@ class Context(common.Context):
             raise ElementNotFoundException(desc, "table")
 
         # TODO: validate its tag is table
-
-        self.__differ_time(desc)
         return self.__table(elem)
 
 # ---------------------
@@ -344,6 +362,9 @@ class Context(common.Context):
         return True
 
     def select(self, desc: Descriptor, text):
+
+        self.__differ_time(desc)
+
         # activate
         self.__activate(desc)
 
@@ -354,7 +375,6 @@ class Context(common.Context):
         if not isinstance(elem, WebElement):
             return False
 
-        self.__differ_time(desc)
         if not self.__select(elem, text):
             return OperationFailureException(desc, "select")
 
@@ -455,11 +475,12 @@ class Context(common.Context):
         
 
     def text(self, desc: Descriptor) -> str:
+        self.__differ_time(desc)
+
         self.__activate(desc)
 
         elem = self.get(desc)
         if not elem:
             raise ElementNotFoundException(desc, "text")
 
-        self.__differ_time(desc)
         return elem.text
