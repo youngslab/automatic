@@ -451,6 +451,7 @@ class Context(common.Context):
         Special case not to rasie exception. So need to call lower-level APIs
         """
         try:
+            self.__differ_time(desc)
             self.__activate(desc)
             if isinstance(desc, Xpath) and desc.multiple:
                 elems = self.get_elements(desc)
