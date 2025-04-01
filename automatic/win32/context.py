@@ -16,6 +16,10 @@ from automatic.win32.elements import Image, is_window, Control, Title, Text
 from typing import Union
 from pyscreeze import Point
 
+from automatic.utils import Logger, LOGGER_AUTOMATIC
+
+logger = Logger.get(LOGGER_AUTOMATIC)
+
 def get_or(a, b) -> int:
     return a if a else b
 
@@ -179,9 +183,11 @@ class Context(common.Context):
     def __click_point(self, pos: Point):
         if pos is None:
             return
+        logger.debug(f"Click at {pos}")
         pyautogui.click(pos)
 
     def type(self, desc: Descriptor, text):
         self.click(desc)
+        logger.debug("Typing: " + text)
         pyautogui.typewrite(text)
 

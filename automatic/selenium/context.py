@@ -65,9 +65,10 @@ class Context(common.Context):
     def get_element(self, desc: Descriptor) -> Union[WebElement, None]:
         timeout = get_or(desc.timeout(), self.__timeout)
         try:
-            if hasattr(desc, 'visible') and not desc.visible:
+            # visible
+            if hasattr(desc, 'clickable') and desc.clickable:
                 return WebDriverWait(self.__driver, timeout).until(
-                    lambda d: d.find_element(desc.by(), desc.path()))
+                    EC.element_to_be_clickable((desc.by(), desc.path())))
             else:
                 es = self.get_elements(desc)
                 if len(es) == 0:
@@ -75,6 +76,7 @@ class Context(common.Context):
                     return None
                 elif len(es) > 1:
                     logger.debug("Multiple items are found")
+                    logger.debug(f"elements: [{es}]")
                     return None
                 else:
                     return es[0]
@@ -335,7 +337,7 @@ class Context(common.Context):
         try:
             return pd.read_html(StringIO(elem.get_attribute('outerHTML')))[0]
         except ValueError as e:
-            logger.warning("Can't read table from given element. e={e}")
+            logger.warning(f"Can't read table from given element. e={e}")
             return None
 
     def table(self, desc: Descriptor):

@@ -26,12 +26,13 @@ class Xpath(DefaultFrameDescriptor):
         FromEnd = 3
 
     def __init__(self, desc, path, *, parent: Descriptor = DefaultFrame(),
-                 timeout=None, differ=0, multiple=False, sample=0, order=Order.FromStart, visible=True):
+                 timeout=None, differ=0, multiple=False, sample=0, order=Order.FromStart, visible=True, clickable=False):
         super().__init__(desc, path, parent=parent, timeout=timeout, differ=differ)
         self.multiple=multiple
         self.sample = sample
         self.order = order
         self.visible = visible
+        self.clickable = clickable
 
     def by(self) -> str:
         return "xpath"
