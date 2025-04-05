@@ -2,10 +2,11 @@
 from .common import Descriptor
 from automatic.common.exceptions import *
 from .common.utils import package_name
-from .utils.logger import *
 import pandas as pd
+import logging
 
-logger = Logger.get(LOGGER_AUTOMATIC)
+LOGGER_AUTOMATIC = "Automatic"
+logger = logging.getLogger(LOGGER_AUTOMATIC)
 
 class Automatic:
     def __init__(self, contexts):
