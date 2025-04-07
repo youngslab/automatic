@@ -64,7 +64,7 @@ class Context(common.Context):
 
         elem = self.get(desc)
         if not elem:
-            raise ElementNotFoundException(desc, "activate")
+            raise ElementNotFoundException(None, desc, "activate")
 
         if is_window(desc):
             timeout = get_or(desc.timeout(), self.__timeout)
@@ -158,7 +158,7 @@ class Context(common.Context):
 
         elem = self.get(desc)
         if not elem:
-            raise ElementNotFoundException(desc, "click")
+            raise ElementNotFoundException(None, desc, "click")
 
         self.wait(desc)
 

@@ -221,7 +221,7 @@ class Context(common.Context):
         # get element
         elem = self.get(desc)
         if not elem:
-            raise ElementNotFoundException(desc, "activate")
+            raise ElementNotFoundException(self.__driver, desc, "activate")
 
         # parent: Window
         if is_window(desc):
@@ -283,7 +283,7 @@ class Context(common.Context):
 
         elem = self.get(descriptor)
         if not elem:
-            raise ElementNotFoundException(descriptor, "click")
+            raise ElementNotFoundException(self.__driver, descriptor, "click")
 
         if not isinstance(elem, WebElement):
             raise InvalidOperationException(descriptor, "click")
@@ -301,7 +301,7 @@ class Context(common.Context):
         # get all elements
         elems = self.get_all(descriptor)
         if not elems:
-            raise ElementNotFoundException(descriptor, "click")
+            raise ElementNotFoundException(self.__driver, descriptor, "click")
 
         # sample
         if num_samples:
@@ -325,7 +325,7 @@ class Context(common.Context):
 
         elem = self.get(desc)
         if not elem:
-            raise ElementNotFoundException(desc, "type")
+            raise ElementNotFoundException(self.__driver, desc, "type")
 
         if not isinstance(elem, WebElement):
             return False
@@ -347,7 +347,7 @@ class Context(common.Context):
 
         elem = self.get(desc)
         if not elem:
-            raise ElementNotFoundException(desc, "table")
+            raise ElementNotFoundException(self.__driver, desc, "table")
 
         # TODO: validate its tag is table
         return self.__table(elem)
@@ -372,7 +372,7 @@ class Context(common.Context):
 
         elem = self.get(desc)
         if not elem:
-            raise ElementNotFoundException(desc, "select")
+            raise ElementNotFoundException(self.__driver,desc, "select")
 
         if not isinstance(elem, WebElement):
             return False
@@ -385,7 +385,7 @@ class Context(common.Context):
             raise Exception("Descriptor should not be none")
         elem = self.get(desc)
         if not elem:
-            raise ElementNotFoundException(desc, "accept")
+            raise ElementNotFoundException(self.__driver,desc, "accept")
         logger.debug(f"accept: {elem.text}")
         elem.accept()
         
@@ -394,7 +394,7 @@ class Context(common.Context):
             raise Exception("Descriptor should not be none")
         elem = self.get(desc)
         if not elem:
-            raise ElementNotFoundException(desc, "dismiss")
+            raise ElementNotFoundException(self.__driver,desc, "dismiss")
         logger.debug(f"dismiss: {elem.text}")
         elem.dismiss()
 
@@ -484,6 +484,6 @@ class Context(common.Context):
 
         elem = self.get(desc)
         if not elem:
-            raise ElementNotFoundException(desc, "text")
+            raise ElementNotFoundException(self.__driver,desc, "text")
 
         return elem.text
