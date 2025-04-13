@@ -1,46 +1,30 @@
-
 from .descriptor import Descriptor
 
-
-class InvalidOperationException(Exception):
-    def __init__(self, desc: Descriptor, op, message="Operation is not supported."):
+class AutomaticException(Exception):
+    def __init__(self, context, desc: Descriptor, op=None, message="An error occurred."):
         self.message = message
-        self.desc = desc
-        self.op
-        super().__init__(self.message)
-
-    def __str__(self):
-        return f'{self.message}. op={self.op}, desc={self.desc}'
-
-
-
-class ActivationFailureException(Exception):
-    def __init__(self, desc: Descriptor):
-        self.desc = desc
-        super().__init__("Activation Failure")
-
-    def __str__(self):
-        return f'Activation Failure. desc={self.desc}'
-
-class OperationFailureException(Exception):
-    def __init__(self, desc: Descriptor, op, message="Operation failed."):
-        self.message = message
-        self.desc = desc
-        super().__init__(self.message)
-
-    def __str__(self):
-        return f'{self.message}. op={self.op}, desc={self.desc}'
-     
-
-class ElementNotFoundException(Exception):
-    def __init__(self, driver, desc: Descriptor, op , message="Element is not Found."):
-        self.message = message
+        self.context = context
         self.desc = desc
         self.op = op
-        self.driver = driver
         super().__init__(self.message)
 
     def __str__(self):
         return f'{self.message}. op={self.op}, desc={self.desc}'
-    
+
+class InvalidOperationException(AutomaticException):
+    def __init__(self, context, desc: Descriptor, op, message="Operation is not supported."):
+        super().__init__(context, desc, op, message)
+
+class ActivationFailureException(AutomaticException):
+    def __init__(self, context, desc: Descriptor, message="Activation Failure"):
+        super().__init__(context, desc, None, message)
+
+class OperationFailureException(AutomaticException):
+    def __init__(self, context, desc: Descriptor, op, message="Operation failed."):
+        super().__init__(context, desc, op, message)
+
+class ElementNotFoundException(AutomaticException):
+    def __init__(self, context, desc: Descriptor, op, message="Element is not Found."):
+        super().__init__(context, desc, op, message)
+
 

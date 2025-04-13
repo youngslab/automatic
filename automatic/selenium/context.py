@@ -1,4 +1,4 @@
-
+import os
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement
 from selenium.webdriver.support.select import Select
@@ -52,20 +52,17 @@ class Context(common.Context):
         elif is_default_frame(desc):
             return desc
         else:
-            # TODO: exception
             return None
 
     def get_all(self, desc: Descriptor):
         if is_element(desc):
             return self.get_elements(desc)
         else:
-            # NotSupportedOperation
             return None
 
     def get_element(self, desc: Descriptor) -> Union[WebElement, None]:
         timeout = get_or(desc.timeout(), self.__timeout)
         try:
-            # visible
             if hasattr(desc, 'clickable') and desc.clickable:
                 return WebDriverWait(self.__driver, timeout).until(
                     EC.element_to_be_clickable((desc.by(), desc.path())))
@@ -80,12 +77,10 @@ class Context(common.Context):
                     return None
                 else:
                     return es[0]
-                # return WebDriverWait(self.__driver, timeout).until(
-                #     EC.element_to_be_clickable((desc.by(), desc.path())))
         except TimeoutException:
             return None
         except Exception as e:
-            logger.debug(f"ERROR: Failed to get an element xx. type={type(e)} e={e}")
+            logger.debug(f"ERROR: Failed to get an element. type={type(e)} e={e}")
             return None
 
     def get_elements(self, desc: Descriptor) -> List[WebElement]:
@@ -221,7 +216,7 @@ class Context(common.Context):
         # get element
         elem = self.get(desc)
         if not elem:
-            raise ElementNotFoundException(self.__driver, desc, "activate")
+            raise ElementNotFoundException(self, desc, "activate")
 
         # parent: Window
         if is_window(desc):
@@ -233,7 +228,7 @@ class Context(common.Context):
                 self.set_current_frame(elem)
 
         else:
-            raise InvalidOperationException(desc, "activate")
+            raise InvalidOperationException(self, desc, "activate")
 
     def __type(self, element: WebElement, text: str):
         # if not 
@@ -283,13 +278,13 @@ class Context(common.Context):
 
         elem = self.get(descriptor)
         if not elem:
-            raise ElementNotFoundException(self.__driver, descriptor, "click")
+            raise ElementNotFoundException(self, descriptor, "click")
 
         if not isinstance(elem, WebElement):
-            raise InvalidOperationException(descriptor, "click")
+            raise InvalidOperationException(self, descriptor, "click")
         
         if not self.__click(elem):
-            raise OperationFailureException(descriptor, "click")
+            raise OperationFailureException(self, descriptor, "click")
 
     def clicks(self, descriptor: Descriptor, *, num_samples=None):
         
@@ -301,7 +296,7 @@ class Context(common.Context):
         # get all elements
         elems = self.get_all(descriptor)
         if not elems:
-            raise ElementNotFoundException(self.__driver, descriptor, "click")
+            raise ElementNotFoundException(self, descriptor, "click")
 
         # sample
         if num_samples:
@@ -312,7 +307,7 @@ class Context(common.Context):
             # differ
             self.__differ_time(descriptor)
             if not self.__click(elem):
-                raise OperationFailureException(descriptor, "click")
+                raise OperationFailureException(self, descriptor, "click")
 
 # ---------------------
 # ------ TYPES --------
@@ -325,13 +320,13 @@ class Context(common.Context):
 
         elem = self.get(desc)
         if not elem:
-            raise ElementNotFoundException(self.__driver, desc, "type")
+            raise ElementNotFoundException(self, desc, "type")
 
         if not isinstance(elem, WebElement):
             return False
         
         if not self.__type(elem, text):
-            raise OperationFailureException(desc, "click")
+            raise OperationFailureException(self, desc, "type")
 
     def __table(self, elem: WebElement):
         try:
@@ -347,7 +342,7 @@ class Context(common.Context):
 
         elem = self.get(desc)
         if not elem:
-            raise ElementNotFoundException(self.__driver, desc, "table")
+            raise ElementNotFoundException(self, desc, "table")
 
         # TODO: validate its tag is table
         return self.__table(elem)
@@ -372,20 +367,20 @@ class Context(common.Context):
 
         elem = self.get(desc)
         if not elem:
-            raise ElementNotFoundException(self.__driver,desc, "select")
+            raise ElementNotFoundException(self, desc, "select")
 
         if not isinstance(elem, WebElement):
             return False
 
         if not self.__select(elem, text):
-            return OperationFailureException(desc, "select")
+            return OperationFailureException(self, desc, "select")
 
     def accept(self, desc: Descriptor):
         if not desc:
             raise Exception("Descriptor should not be none")
         elem = self.get(desc)
         if not elem:
-            raise ElementNotFoundException(self.__driver,desc, "accept")
+            raise ElementNotFoundException(self, desc, "accept")
         logger.debug(f"accept: {elem.text}")
         elem.accept()
         
@@ -394,7 +389,7 @@ class Context(common.Context):
             raise Exception("Descriptor should not be none")
         elem = self.get(desc)
         if not elem:
-            raise ElementNotFoundException(self.__driver,desc, "dismiss")
+            raise ElementNotFoundException(self, desc, "dismiss")
         logger.debug(f"dismiss: {elem.text}")
         elem.dismiss()
 
@@ -484,6 +479,41 @@ class Context(common.Context):
 
         elem = self.get(desc)
         if not elem:
-            raise ElementNotFoundException(self.__driver,desc, "text")
+            raise ElementNotFoundException(self, desc, "text")
 
         return elem.text
+
+    def capture(self, base_filename="capture"):
+        """
+        Captures the current DOM and a screenshot of the page.
+        Files are saved in the ~/.iaa/log/ directory.
+        """
+        # Ensure the log directory exists
+        log_dir = os.path.join(os.path.expanduser("~"), ".iaa", "log")
+        os.makedirs(log_dir, exist_ok=True)
+
+        # Define file paths
+        dom_filepath = os.path.join(log_dir, f"{base_filename}.html")
+        screenshot_filepath = os.path.join(log_dir, f"{base_filename}.png")
+
+        # Capture DOM
+        try:
+            with open(dom_filepath, "w", encoding="utf-8") as dom_file:
+                dom_file.write(self.__driver.page_source)
+            logger.info(f"DOM saved to {dom_filepath}")
+        except Exception as e:
+            logger.error(f"Failed to save DOM: {e}")
+
+        # Capture screenshot
+        try:
+            if self.__driver.save_screenshot(screenshot_filepath):
+                logger.info(f"Screenshot saved to {screenshot_filepath}")
+            else:
+                logger.error("Failed to save screenshot")
+        except Exception as e:
+            logger.error(f"Failed to capture screenshot: {e}")
+
+        return dom_filepath, screenshot_filepath
+
+
+

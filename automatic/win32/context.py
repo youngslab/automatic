@@ -1,4 +1,3 @@
-
 # pyautogui
 import pyautogui
 import pyperclip
@@ -7,6 +6,7 @@ import pytesseract
 from PIL import ImageGrab
 import cv2
 import numpy as np
+import os
 
 from automatic.common import Descriptor
 import automatic.common as common
@@ -19,6 +19,8 @@ from pyscreeze import Point
 from automatic.utils import Logger, LOGGER_AUTOMATIC
 
 logger = Logger.get(LOGGER_AUTOMATIC)
+
+pyautogui.FAILSAFE = False
 
 def get_or(a, b) -> int:
     return a if a else b
@@ -64,7 +66,7 @@ class Context(common.Context):
 
         elem = self.get(desc)
         if not elem:
-            raise ElementNotFoundException(None, desc, "activate")
+            raise ElementNotFoundException(self, desc, "activate")
 
         if is_window(desc):
             timeout = get_or(desc.timeout(), self.__timeout)
@@ -158,7 +160,7 @@ class Context(common.Context):
 
         elem = self.get(desc)
         if not elem:
-            raise ElementNotFoundException(None, desc, "click")
+            raise ElementNotFoundException(self, desc, "click")
 
         self.wait(desc)
 
@@ -167,7 +169,7 @@ class Context(common.Context):
         elif isinstance(elem, Control):
             self.__click_control(elem)
         else:
-            raise InvalidOperationException(desc, "click")
+            raise InvalidOperationException(self, desc, "click")
 
     def __click_control(self, ctrl: Control):
         if not ctrl:
@@ -177,7 +179,20 @@ class Context(common.Context):
         if not parent:
             raise Exception(f"Control should have parent. {ctrl}")
         
-        autoit.control_click(parent.path(), ctrl.path())
+        # 1. parent exisits? 
+        if not autoit.win_exists(parent.path()):
+            logger.error("Parent window is not found.")
+            raise ElementNotFoundException(self, parent, "click")
+        else:
+            try:
+                autoit.control_get_text(parent.path(), ctrl.path())
+            except Exception as e:
+                logger.error("Control is not found. " + str(e))
+                raise ElementNotFoundException(self, parent, "click")
+             
+        if not autoit.control_click(parent.path(), ctrl.path()):
+            logger.error(f"Control is not clicked. win={parent.path()}, ctrl={ctrl.path()}")
+            
 
 
     def __click_point(self, pos: Point):
@@ -191,3 +206,24 @@ class Context(common.Context):
         logger.debug("Typing: " + text)
         pyautogui.typewrite(text)
 
+    def capture(self, base_filename="capture"):
+        """
+        Captures the current screen and saves it as an image.
+        Files are saved in the ~/.iaa/log/ directory.
+        """
+        # Ensure the log directory exists
+        log_dir = os.path.join(os.path.expanduser("~"), ".iaa", "log")
+        os.makedirs(log_dir, exist_ok=True)
+
+        # Define file path
+        screenshot_filepath = os.path.join(log_dir, f"{base_filename}.png")
+
+        # Capture screenshot
+        try:
+            screenshot = pyautogui.screenshot()
+            screenshot.save(screenshot_filepath)
+            logger.info(f"Screenshot saved to {screenshot_filepath}")
+        except Exception as e:
+            logger.error(f"Failed to capture screenshot: {e}")
+
+        return screenshot_filepath
