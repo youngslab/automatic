@@ -513,7 +513,7 @@ class Context(common.Context):
         except Exception as e:
             logger.error(f"Failed to capture screenshot: {e}")
 
-        return dom_filepath, screenshot_filepath
+        return [dom_filepath, screenshot_filepath]
 
 
 
