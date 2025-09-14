@@ -6,12 +6,12 @@ with open("README.md", "r", encoding="utf-8") as fh:
 setuptools.setup(
     name="automatic-py",
     version="0.1.0",
-    author="Your Name",
-    author_email="your.email@example.com",
+    author="Jaeyoung Park",
+    author_email="jaeyoungs.park@gmail.com",
     description="A Python library for automation.",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/your-repo",
+    url="https://github.com/youngslab/automatic",
     packages=setuptools.find_packages(),
     classifiers=[
         "Programming Language :: Python :: 3",
